@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Tâches Business Units</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gestion des Tâches</h1>
+            <p class="subtitle">Interface Connectée Google Sheets</p>
+        </header>
+
+        <div class="main-content">
+            <div class="controls">
+                <div class="filter-group">
+                    <label>📑 Onglet :</label>
+                    <!-- ✅ Les onglets seront chargés automatiquement depuis config.json -->
+                    <select id="filterPage" class="select-input">
+                        <option value="">Chargement...</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>BU :</label>
+                    <select id="filterBU" class="select-input">
+                        <option value="">Toutes</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Affectation :</label>
+                    <select id="filterAffectation" class="select-input">
+                        <option value="">Tous</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Statut :</label>
+                    <select id="filterStatus" class="select-input">
+                        <option value="">Tous</option>
+                        <option value="PAS FAIT">🔴 À faire</option>
+                        <option value="EN COURS">🟠 En cours</option>
+                        <option value="FAIT">🟢 Terminé</option>
+                    </select>
+                </div>
+
+                <button id="refreshButton" class="btn btn-secondary">Actualiser</button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card stat-red">
+                    <div class="stat-icon">🔴</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statTodo">0</div>
+                        <div class="stat-label">À faire</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-orange">
+                    <div class="stat-icon">🟠</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statInProgress">0</div>
+                        <div class="stat-label">En cours</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-green">
+                    <div class="stat-icon">🟢</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statDone">0</div>
+                        <div class="stat-label">Terminés</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Synchronisation...</p>
+            </div>
+            
+            <div class="error-message" id="errorMessage" style="display: none;"></div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <!-- ✅ Les colonnes seront générées automatiquement -->
+                        </tr>
+                    </thead>
+                    <tbody id="tasksBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
