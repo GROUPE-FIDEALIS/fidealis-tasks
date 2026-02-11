@@ -283,6 +283,30 @@ tbody td {
     font-size: 0.9rem;
 }
 
+.section-row {
+    background: linear-gradient(to right, rgba(59, 130, 246, 0.06) 0%, rgba(99, 102, 241, 0.06) 100%);
+    border-left: 3px solid rgba(59, 130, 246, 0.4);
+    border-top: 1px solid rgba(100, 116, 139, 0.2);
+    border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.section-title {
+    text-align: left !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;  /* ← Un peu plus grand */
+    padding: 12px 20px !important;
+    letter-spacing: 0.3px !important;
+    color: #cbd5e1 !important;  /* ← Plus clair (était #94a3b8) */
+    text-shadow: none !important;
+    opacity: 1 !important;  /* ← Opacité complète (était 0.9) */
+    text-transform: none !important;
+}
+
+.section-row:hover {
+    background: linear-gradient(to right, rgba(59, 130, 246, 0.09) 0%, rgba(99, 102, 241, 0.09) 100%);
+    border-left-color: rgba(59, 130, 246, 0.6);
+}
+
 .status-selector {
     display: inline-flex;
     gap: 8px;
