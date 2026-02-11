@@ -34,6 +34,9 @@ async function loadOnglets() {
   try {
     const response = await fetch(`${CONFIG_FILE}?t=${Date.now()}`);
     const config = await response.json();
+    console.log("CONFIG:", config);
+    console.log("onglets:", config.onglets);
+    console.log("pages:", config.pages, "sheets:", config.sheets, "tabs:", config.tabs);
 
     filterPage.innerHTML = '';
 
