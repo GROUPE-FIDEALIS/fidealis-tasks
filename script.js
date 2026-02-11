@@ -31,74 +31,30 @@ const filterAffectationGroup = filterAffectation?.closest('.filter-group');
 // INITIALISATION : CHARGEMENT DES ONGLETS
 // ═══════════════════════════════════════════════════════════
 async function loadOnglets() {
-  try {
-    const response = await fetch(`${CONFIG_FILE}?t=${Date.now()}`);
-    const config = await response.json();
-    console.log("CONFIG:", config);
-    console.log("onglets:", config.onglets);
-    console.log("pages:", config.pages, "sheets:", config.sheets, "tabs:", config.tabs);
-
-    filterPage.innerHTML = '';
-
-    // 1) Format attendu : { onglets: [ {value, label}, ... ] }
-    if (Array.isArray(config.onglets) && config.onglets.length) {
-      config.onglets.forEach(o => {
-        const option = document.createElement('option');
-        option.value = o.value ?? o.label;
-        option.textContent = o.label ?? o.value;
-        filterPage.appendChild(option);
-      });
-      console.log("✅ Onglets chargés (config.onglets)");
-      return true;
+    try {
+        const response = await fetch(`${CONFIG_FILE}?t=${new Date().getTime()}`);
+        const config = await response.json();
+        
+        filterPage.innerHTML = '';
+        config.onglets.forEach(onglet => {
+            const option = document.createElement('option');
+            option.value = onglet.value;
+            option.textContent = onglet.label;
+            filterPage.appendChild(option);
+        });
+        
+        console.log("✅ Onglets chargés depuis config.json");
+        return true;
+    } catch (err) {
+        console.warn("⚠️ Impossible de charger config.json:", err);
+        // Fallback : onglets par défaut
+        filterPage.innerHTML = `
+            <option value="Tache du jour">Tâche du jour</option>
+            <option value="depot jeux">Dépôt Jeux</option>
+            <option value="certeco">Certeco & Veryproof</option>
+        `;
+        return false;
     }
-
-    // 2) Autre format : { pages: ["...", "..."] } ou { sheets: ["..."] }
-    const list =
-      (Array.isArray(config.pages) && config.pages) ||
-      (Array.isArray(config.sheets) && config.sheets) ||
-      (Array.isArray(config.tabs) && config.tabs) ||
-      [];
-
-    if (list.length) {
-      list.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        filterPage.appendChild(option);
-      });
-      console.log("✅ Onglets chargés (liste pages/sheets/tabs)");
-      return true;
-    }
-
-    // 3) Dernier recours : si config est un objet avec des clés (ex: { "Tache du jour": {...} })
-    const keys = Object.keys(config).filter(k =>
-    !['onglets', 'pages', 'sheets', 'tabs'].includes(k) &&
-    config[k] && typeof config[k] === 'object'
-    );
-    if (keys.length) {
-      keys.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        filterPage.appendChild(option);
-      });
-      console.log("✅ Onglets chargés (clés de config)");
-      return true;
-    }
-
-    throw new Error("Aucune liste d'onglets trouvée dans config.json");
-
-  } catch (err) {
-    console.warn("⚠️ Impossible de charger/parse config.json:", err);
-
-    // Fallback : onglets par défaut
-    filterPage.innerHTML = `
-      <option value="Tache du jour">Tâche du jour</option>
-      <option value="depot jeux">Dépôt Jeux</option>
-      <option value="certeco">Certeco & Veryproof</option>
-    `;
-    return false;
-  }
 }
 
 // ═══════════════════════════════════════════════════════════
