@@ -71,7 +71,10 @@ async function loadOnglets() {
     }
 
     // 3) Dernier recours : si config est un objet avec des clés (ex: { "Tache du jour": {...} })
-    const keys = Object.keys(config).filter(k => typeof config[k] === 'object');
+    const keys = Object.keys(config).filter(k =>
+    !['onglets', 'pages', 'sheets', 'tabs'].includes(k) &&
+    config[k] && typeof config[k] === 'object'
+    );
     if (keys.length) {
       keys.forEach(name => {
         const option = document.createElement('option');
