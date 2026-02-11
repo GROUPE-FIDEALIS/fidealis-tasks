@@ -2,7 +2,7 @@
     "onglets": [
       { "value": "Tache du jour", "label": "Tâche du jour" },
       { "value": "depot jeux", "label": "Dépôt Jeux" },
-      { "value": "certeco", "label": "Certeco & Veryproof" },
+      { "value": "certeco & veryrpoof", "label": "certeco & veryrpoof" },
       { "value": "ConstApp", "label": "ConstApp" },
       { "value": "CPC BIOMETRY", "label": "CPC BIOMETRY" },
       { "value": "CPC CALL", "label": "CPC CALL" },
