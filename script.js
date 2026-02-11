@@ -2,7 +2,7 @@
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════
 const API_URL = "https://api.steinhq.com/v1/storages/698b2a6baffba40a624b12de";
-const CONFIG_FILE = "config.json"; // Fichier de configuration des onglets
+const CONFIG_FILE = "config.json";
 
 // ═══════════════════════════════════════════════════════════
 // VARIABLES GLOBALES
@@ -32,7 +32,7 @@ const filterAffectationGroup = filterAffectation?.closest('.filter-group');
 // ═══════════════════════════════════════════════════════════
 async function loadOnglets() {
     try {
-        const response = await fetch(CONFIG_FILE);
+        const response = await fetch(`${CONFIG_FILE}?t=${new Date().getTime()}`);
         const config = await response.json();
         
         filterPage.innerHTML = '';
@@ -44,9 +44,16 @@ async function loadOnglets() {
         });
         
         console.log("✅ Onglets chargés depuis config.json");
+        return true;
     } catch (err) {
-        console.warn("⚠️ Impossible de charger config.json, onglets par défaut utilisés");
-        // Fallback : garder les onglets du HTML
+        console.warn("⚠️ Impossible de charger config.json:", err);
+        // Fallback : onglets par défaut
+        filterPage.innerHTML = `
+            <option value="Tache du jour">Tâche du jour</option>
+            <option value="depot jeux">Dépôt Jeux</option>
+            <option value="certeco">Certeco & Veryproof</option>
+        `;
+        return false;
     }
 }
 
@@ -54,11 +61,17 @@ async function loadOnglets() {
 // CHARGEMENT DES TÂCHES
 // ═══════════════════════════════════════════════════════════
 async function loadTasks() {
-    const pageUrl = `${API_URL}/${filterPage.value}`;
+    const sheetName = filterPage.value;
+    if (!sheetName) {
+        console.warn("⚠️ Aucun onglet sélectionné");
+        return;
+    }
+    
+    const pageUrl = `${API_URL}/${encodeURIComponent(sheetName)}`;
     
     console.log("════════════════════════════════");
     console.log("🔗 URL complète :", pageUrl);
-    console.log("📄 Onglet sélectionné :", filterPage.value);
+    console.log("📄 Onglet sélectionné :", sheetName);
     
     try {
         showLoading(true); 
@@ -69,7 +82,7 @@ async function loadTasks() {
         console.log("📡 Statut HTTP :", response.status);
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status} - Onglet "${filterPage.value}" introuvable`);
+            throw new Error(`HTTP ${response.status} - Onglet "${sheetName}" introuvable ou vide`);
         }
         
         const data = await response.json();
@@ -82,8 +95,9 @@ async function loadTasks() {
         console.log("════════════════════════════════");
 
         if (!data || data.length === 0) {
-            tasksBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:50px">Aucune donnée.</td></tr>';
-            showLoading(false); 
+            tasksBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:50px">Aucune donnée dans cet onglet.</td></tr>';
+            showLoading(false);
+            updateStats();
             return;
         }
 
@@ -91,7 +105,7 @@ async function loadTasks() {
         // DÉTECTION AUTOMATIQUE DES COLONNES
         // ═══════════════════════════════════════════════════════════
         const firstRow = data[0];
-        detectedColumns = Object.keys(firstRow).filter(col => col.trim() !== '');
+        detectedColumns = Object.keys(firstRow).filter(col => col && col.trim() !== '');
         
         // Détecter la colonne AVANCEMENT
         avancementColumn = detectedColumns.find(col => 
@@ -107,14 +121,10 @@ async function loadTasks() {
         // MAPPING DES DONNÉES
         // ═══════════════════════════════════════════════════════════
         allTasks = data.filter(row => {
-            const descCol = detectedColumns.find(col => col.toLowerCase().includes('description'));
-            const desc = descCol ? (row[descCol] || '') : '';
-            
-            // Ignorer les lignes vides et les titres de phase
-            const isPhaseTitle = desc.toString().toUpperCase().includes('PHASE') && 
-                                desc === desc.toUpperCase();
-            
-            return desc.trim() !== "" && !isPhaseTitle;
+            const hasContent = Object.values(row).some(val => 
+                val && val.toString().trim() !== ''
+            );
+            return hasContent;
         }).map(row => {
             const task = {};
             
@@ -122,6 +132,36 @@ async function loadTasks() {
             detectedColumns.forEach(col => {
                 task[col] = row[col] || '';
             });
+            
+            // ✅ DÉTECTER SI C'EST UNE LIGNE DE TITRE/SECTION
+            const descCol = detectedColumns.find(col => col.toLowerCase().includes('description'));
+            const etapeCol = detectedColumns.find(col => col.toLowerCase().includes('étape') || col.toLowerCase().includes('etape'));
+            
+            const desc = descCol ? (task[descCol] || '').toString().trim() : '';
+            const etape = etapeCol ? (task[etapeCol] || '').toString().trim() : '';
+            
+            // ✅ CRITÈRES DE DÉTECTION D'UN TITRE
+            const hasPhaseKeyword = desc.toUpperCase().includes('PHASE') || 
+                                    etape.toUpperCase().includes('PHASE') ||
+                                    desc.includes('===') || 
+                                    desc.includes('---') ||
+                                    desc.includes('___');
+            
+            const isAllCaps = desc.length > 5 && desc === desc.toUpperCase() && desc.match(/[A-ZÀ-Ÿ]/);
+            
+            // Vérifier si les colonnes importantes sont vides
+            const affCol = detectedColumns.find(col => 
+                col.toLowerCase().includes('affectation') || 
+                col.toLowerCase().includes('assigné')
+            );
+            
+            const hasNoAssignment = !task[affCol]?.trim();
+            const hasNoProgress = !task[avancementColumn]?.trim() || 
+                                 task[avancementColumn] === 'PAS FAIT';
+            
+            const isSectionTitle = (hasPhaseKeyword || isAllCaps) && hasNoAssignment && hasNoProgress;
+            
+            task._isSectionTitle = isSectionTitle;
             
             // Normaliser AVANCEMENT en majuscules
             if (avancementColumn && task[avancementColumn]) {
@@ -134,6 +174,14 @@ async function loadTasks() {
         });
 
         console.log("✅ Tâches chargées :", allTasks.length);
+        
+        // ✅ DEBUG : Afficher les sections détectées
+        const sections = allTasks.filter(t => t._isSectionTitle);
+        console.log("📌 Sections détectées :", sections.length);
+        if (sections.length > 0) {
+            const descCol = detectedColumns.find(col => col.toLowerCase().includes('description'));
+            console.log("📋 Liste des sections :", sections.map(s => descCol ? s[descCol] : 'N/A'));
+        }
 
         // ═══════════════════════════════════════════════════════════
         // CONSTRUCTION DE L'INTERFACE
@@ -148,6 +196,11 @@ async function loadTasks() {
         console.error("❌ ERREUR :", err);
         showError(`Erreur : ${err.message}`);
         showLoading(false);
+        
+        tasksBody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ef4444;">
+            ⚠️ ${err.message}<br><br>
+            <small>Vérifiez que l'onglet "${sheetName}" existe dans votre Google Sheet</small>
+        </td></tr>`;
     }
 }
 
@@ -160,8 +213,9 @@ function buildTableHeader() {
     visibleColumns = [];
     
     detectedColumns.forEach(col => {
-        // ✅ VÉRIFIER SI LA COLONNE CONTIENT DES DONNÉES RÉELLES
+        // ✅ VÉRIFIER SI LA COLONNE CONTIENT DES DONNÉES RÉELLES (hors sections)
         const hasData = allTasks.some(t => 
+            !t._isSectionTitle && // ✅ IGNORER LES SECTIONS
             t[col] && 
             t[col].toString().trim() !== '' && 
             t[col] !== '-'
@@ -196,6 +250,7 @@ function buildDynamicFilters() {
     );
     
     const hasBUData = buColumn && allTasks.some(t => 
+        !t._isSectionTitle && // ✅ IGNORER LES SECTIONS
         t[buColumn] && 
         t[buColumn].trim() !== '' && 
         t[buColumn] !== '-'
@@ -221,6 +276,7 @@ function buildDynamicFilters() {
     );
     
     const hasAffData = affColumn && allTasks.some(t => 
+        !t._isSectionTitle && // ✅ IGNORER LES SECTIONS
         t[affColumn] && 
         t[affColumn].trim() !== '' && 
         t[affColumn] !== '-'
@@ -250,7 +306,11 @@ function updateDropdownFilters() {
     );
     
     if (buColumn && filterBU) {
-        const bus = [...new Set(allTasks.map(t => t[buColumn]))]
+        const bus = [...new Set(
+            allTasks
+                .filter(t => !t._isSectionTitle) // ✅ IGNORER LES SECTIONS
+                .map(t => t[buColumn])
+        )]
             .filter(x => x && x.trim() && x !== '-')
             .sort();
         
@@ -274,6 +334,7 @@ function updateDropdownFilters() {
     
     if (affColumn && filterAffectation) {
         let names = allTasks
+            .filter(t => !t._isSectionTitle) // ✅ IGNORER LES SECTIONS
             .map(t => t[affColumn] || '')
             .filter(aff => aff.trim() !== '' && aff !== '-')
             .map(aff => aff.split(/[,/]+/))
@@ -309,12 +370,17 @@ function applyFilters() {
     const sAff = affColumn && filterAffectation ? filterAffectation.value : '';
 
     filteredTasks = allTasks.filter(t => {
+        // ✅ TOUJOURS AFFICHER LES SECTIONS
+        if (t._isSectionTitle) return true;
+        
         const matchBU = !sBU || (buColumn && t[buColumn] === sBU);
         const matchStat = !sStat || (avancementColumn && t[avancementColumn] === sStat);
         const matchAff = !sAff || (affColumn && t[affColumn] && t[affColumn].includes(sAff));
         
         return matchBU && matchStat && matchAff;
     });
+    
+    console.log(`🔍 Filtrage : ${filteredTasks.length}/${allTasks.length} tâches affichées`);
     
     displayTasks(); 
     updateStats();
@@ -326,14 +392,66 @@ function applyFilters() {
 function displayTasks() {
     tasksBody.innerHTML = '';
     
+    if (filteredTasks.length === 0) {
+        tasksBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:50px;color:#94a3b8;">Aucune tâche ne correspond aux filtres sélectionnés.</td></tr>';
+        return;
+    }
+    
     filteredTasks.forEach((task, index) => {
         const tr = document.createElement('tr');
+        
+        // ✅ SI C'EST UN TITRE DE SECTION
+        if (task._isSectionTitle) {
+            // Chercher le titre dans plusieurs colonnes possibles
+            const descCol = detectedColumns.find(col => col.toLowerCase().includes('description'));
+            const etapeCol = detectedColumns.find(col => col.toLowerCase().includes('étape') || col.toLowerCase().includes('etape'));
+            
+            // Prioriser la colonne ÉTAPE si elle existe, sinon DESCRIPTION
+            let titleText = '';
+            if (etapeCol && task[etapeCol]) {
+                titleText = task[etapeCol];
+            } else if (descCol && task[descCol]) {
+                titleText = task[descCol];
+            }
+            
+            // Nettoyer le texte (enlever les === et ---)
+            titleText = titleText.replace(/[=\-_]{3,}/g, '').trim();
+            
+            // Ajouter une icône discrète selon le contenu
+            let icon = '▸'; // Icône par défaut simple
+            const upperTitle = titleText.toUpperCase();
+            
+            if (upperTitle.includes('PHASE 0') || upperTitle.includes('PASSATION')) {
+                icon = '◆';
+            } else if (upperTitle.includes('PHASE 1') || upperTitle.includes('FONDATION')) {
+                icon = '▸';
+            } else if (upperTitle.includes('PHASE 2') || upperTitle.includes('CONTENU')) {
+                icon = '▹';
+            } else if (upperTitle.includes('PHASE 3') || upperTitle.includes('DÉVELOPPEMENT') || upperTitle.includes('DEVELOPPEMENT')) {
+                icon = '▸';
+            } else if (upperTitle.includes('PHASE 4')) {
+                icon = '▹';
+            } else if (upperTitle.includes('PHASE 5')) {
+                icon = '▸';
+            }
+            
+            titleText = `${icon} ${titleText}`;
+            
+            tr.innerHTML = `
+                <td colspan="${visibleColumns.length}" class="section-title">
+                    ${titleText || '───────'}
+                </td>
+            `;
+            tr.classList.add('section-row');
+            tasksBody.appendChild(tr);
+            return;
+        }
+        
+        // ✅ SINON, AFFICHER UNE TÂCHE NORMALE
         let html = '';
         
-        // ✅ N'AFFICHER QUE LES COLONNES VISIBLES
         visibleColumns.forEach(col => {
             if (col === avancementColumn) {
-                // Cellule spéciale pour les boutons de statut
                 const status = task[col] || 'PAS FAIT';
                 html += `
                     <td>
@@ -372,7 +490,8 @@ function displayTasks() {
 async function updateTaskStatus(button) {
     const taskIndex = button.dataset.taskIndex;
     const newStat = button.dataset.status;
-    const pageUrl = `${API_URL}/${filterPage.value}`;
+    const sheetName = filterPage.value;
+    const pageUrl = `${API_URL}/${encodeURIComponent(sheetName)}`;
 
     if (!avancementColumn) {
         alert("Aucune colonne AVANCEMENT détectée !");
@@ -381,12 +500,14 @@ async function updateTaskStatus(button) {
 
     try {
         const task = filteredTasks[taskIndex];
+        const oldStatus = task[avancementColumn]; // ✅ SAUVEGARDER L'ANCIEN STATUT
         
         // Trouver la colonne description pour identifier la ligne
         const descCol = detectedColumns.find(col => col.toLowerCase().includes('description'));
         const descValue = task[descCol];
 
-        await fetch(pageUrl, {
+        // ✅ AJOUTER TIMESTAMP POUR ÉVITER LE CACHE
+        await fetch(`${pageUrl}?t=${new Date().getTime()}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -406,7 +527,10 @@ async function updateTaskStatus(button) {
         console.log(`✅ Statut mis à jour : "${descValue}" → ${newStat}`);
     } catch (err) { 
         console.error("❌ Erreur sauvegarde :", err);
-        alert(`Erreur : ${err.message}`); 
+        alert(`Erreur de synchronisation : ${err.message}`);
+        
+        // ✅ RESTAURER L'ANCIEN STATUT EN CAS D'ERREUR
+        await loadTasks(); // Recharger les données du serveur
     }
 }
 
@@ -417,10 +541,13 @@ function updateStats() {
     const s = { 'PAS FAIT': 0, 'EN COURS': 0, 'FAIT': 0 };
     
     if (avancementColumn) {
-        allTasks.forEach(t => { 
-            const status = t[avancementColumn];
-            if (s[status] !== undefined) s[status]++; 
-        });
+        // ✅ IGNORER LES SECTIONS DANS LES STATS
+        allTasks
+            .filter(t => !t._isSectionTitle)
+            .forEach(t => { 
+                const status = t[avancementColumn];
+                if (s[status] !== undefined) s[status]++; 
+            });
     }
     
     const statTodo = document.getElementById('statTodo');
@@ -463,6 +590,6 @@ if (refreshButton) refreshButton.onclick = () => loadTasks();
 // INITIALISATION
 // ═══════════════════════════════════════════════════════════
 window.onload = async () => {
-    await loadOnglets(); // Charger les onglets depuis config.json
-    loadTasks(); // Charger les données
+    await loadOnglets();
+    await loadTasks();
 };
