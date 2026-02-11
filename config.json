@@ -6,8 +6,9 @@
       { "value": "ConstApp", "label": "ConstApp" },
       { "value": "CPC BIOMETRY", "label": "CPC BIOMETRY" },
       { "value": "CPC CALL", "label": "CPC CALL" },
-      { "value": "CRM Energy", "label": "CRM Energy" }
+      { "value": "CRM Energy", "label": "CRM Energy" },
       { "value": "essai", "label": "essai" }
     ]
   }
+
 
